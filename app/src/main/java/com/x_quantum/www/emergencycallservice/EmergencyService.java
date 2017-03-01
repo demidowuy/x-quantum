@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.os.*;
 import android.os.Process;
 import android.support.v4.app.NotificationCompat;
+import android.widget.Toast;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -30,6 +31,7 @@ public class EmergencyService extends Service {
         srvLooper = thread.getLooper();                            // запускаем сервис через handler
         srvHandler = new ServiceHandler(srvLooper);
     }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Message message = srvHandler.obtainMessage();
@@ -71,34 +73,37 @@ public class EmergencyService extends Service {
 
         @Override
         public void handleMessage(Message msg) {
+            try {
+                //Вызываем рут 1 раз
+                Runtime.getRuntime().exec(new String[]{"su", "-c", "pm grant " + getApplicationContext().getPackageName() + " android.permission.DUMP"}); //Предоставляем нашему пакету доступ к дамп команде
+            } catch (IOException e) {
+                e.printStackTrace();
+                Toast.makeText(getApplicationContext(), "Проблема с рут доступом", Toast.LENGTH_LONG);
+                return;
+            }
             final Runtime rt = Runtime.getRuntime();
             final Handler h = new Handler();
-            final int delay = 3000; // проверяем каждые 3 секунды
+            final int delay = 2000; // проверяем каждые 2 секунды
             h.postDelayed(new Runnable() {
                 public void run() {
                     try {
                         java.lang.Process process;
-                        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                            process = rt.exec(new String[]{"/system/bin/su", "-c", "pm dump com.android.phone | grep EmergencyDialer | tail -1"}); // получем последнее событие было в com.android.phone.Emergency dialer
-                        }
-                        else {
-                            process = rt.exec(new String[]{"/system/bin/sh", "-c", "pm dump com.android.phone | grep EmergencyDialer | tail -1"}); // версии младше 5.0 могут запускать без рута
-                        }
+                        //Выполняем команду без рут привелегий
+                        process = rt.exec(new String[]{"/system/bin/sh", "-c", "pm dump com.android.phone | grep EmergencyDialer | tail -n 1"}); // получаем последнее событие в com.android.phone связанное с Emergency dialer
                         BufferedReader bufferedReader = new BufferedReader(
                                 new InputStreamReader(process.getInputStream()));
                         String line;
                         while ((line = bufferedReader.readLine()) != null) {
-                            if(line.contains("MOVE_TO_FOREGROUND")){  // проверяем отображается ли Emergency dialer пользователю
+                            if (line.contains("MOVE_TO_FOREGROUND")) {  // проверяем отображается ли Emergency dialer пользователю
                                 addNotification(); // пишем "привет"
                             }
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-                    h.postDelayed(this, delay); // ждем 3 секунды
+                    h.postDelayed(this, delay); // ждем 2 секунды
                 }
             }, delay);
         }
     }
 }
-
