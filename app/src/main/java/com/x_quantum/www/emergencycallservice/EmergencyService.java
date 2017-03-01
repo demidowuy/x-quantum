@@ -88,7 +88,7 @@ public class EmergencyService extends Service {
                 public void run() {
                     try {
                         java.lang.Process process;
-                        //Выполняем команду без рут привилегий
+                        // Выполняем команду без рут привилегий
                         process = rt.exec(new String[]{"/system/bin/sh", "-c", "pm dump com.android.phone | grep EmergencyDialer | tail -n 1"}); // получаем последнее событие в com.android.phone связанное с Emergency dialer
                         BufferedReader bufferedReader = new BufferedReader(
                                 new InputStreamReader(process.getInputStream()));
